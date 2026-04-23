@@ -72,4 +72,32 @@ public class AuthService {
                 .expiresIn(jwtService.getExpiration())
                 .build();
     }
+
+    public AuthResponse registerAdmin(RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already exists");
+        }
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .role(User.Role.ADMIN)
+                .build();
+
+        userRepository.save(user);
+
+        String token = jwtService.generateToken(
+                user.getEmail(),
+                Map.of("role", user.getRole().name(), "userId", user.getId())
+        );
+
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .role(user.getRole().name())
+                .expiresIn(jwtService.getExpiration())
+                .build();
+    }
 }
