@@ -12,7 +12,7 @@ volumes:
 services:
 
   # ===========================
-  # PostgreSQL - Order Service
+  # PostgreSQL
   # ===========================
   postgres:
     image: postgres:16-alpine
@@ -34,7 +34,7 @@ services:
       retries: 5
 
   # ===========================
-  # MongoDB - Product Service
+  # MongoDB
   # ===========================
   mongodb:
     image: mongo:7-jammy
@@ -54,7 +54,7 @@ services:
       retries: 5
 
   # ===========================
-  # Redis - Cache Layer
+  # Redis
   # ===========================
   redis:
     image: redis:7-alpine
@@ -72,7 +72,7 @@ services:
       retries: 5
 
   # ===========================
-  # Zookeeper - Kafka dependency
+  # Zookeeper
   # ===========================
   zookeeper:
     image: confluentinc/cp-zookeeper:7.6.0
@@ -85,13 +85,14 @@ services:
     networks:
       - ecommerce-network
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "2181"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: [ "CMD", "bash", "-c", "echo ruok | timeout 2 nc 127.0.0.1 2181 || exit 1" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # ===========================
-  # Apache Kafka
+  # Kafka
   # ===========================
   kafka:
     image: confluentinc/cp-kafka:7.6.0
@@ -138,19 +139,192 @@ services:
       - ecommerce-network
 
   # ===========================
-  # Zipkin - Distributed Tracing
+  # Zipkin
   # ===========================
   zipkin:
     image: openzipkin/zipkin:3
     container_name: ecommerce-zipkin
     ports:
       - "9411:9411"
-    volumes:
-      - zipkin_data:/zipkin
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Eureka Server
+  # ===========================
+  eureka-server:
+    build: ./eureka-server
+    container_name: ecommerce-eureka
+    ports:
+      - "8761:8761"
     networks:
       - ecommerce-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9411/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "wget", "-qO-", "http://localhost:8761/actuator/health"]
+      interval: 30s
+      timeout: 15s
+      retries: 10
+      start_period: 120s
+
+  # ===========================
+  # Config Server
+  # ===========================
+  config-server:
+    build: ./config-server
+    container_name: ecommerce-config
+    ports:
+      - "8888:8888"
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://localhost:8888/actuator/health" ]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+
+  # ===========================
+  # API Gateway
+  # ===========================
+  api-gateway:
+    build: ./api-gateway
+    container_name: ecommerce-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Identity Service
+  # ===========================
+  identity-service:
+    build: ./identity-service
+    container_name: ecommerce-identity
+    ports:
+      - "8085:8085"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orderdb
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Product Service
+  # ===========================
+  product-service:
+    build: ./product-service
+    container_name: ecommerce-product
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATA_MONGODB_URI: mongodb://mongodb:27017/productdb
+      SPRING_DATA_REDIS_HOST: redis
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Order Service
+  # ===========================
+  order-service:
+    build: ./order-service
+    container_name: ecommerce-order
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orderdb
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Inventory Service
+  # ===========================
+  inventory-service:
+    build: ./inventory-service
+    container_name: ecommerce-inventory
+    ports:
+      - "8083:8083"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/orderdb
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
+
+  # ===========================
+  # Notification Service
+  # ===========================
+  notification-service:
+    build: ./notification-service
+    container_name: ecommerce-notification
+    ports:
+      - "8084:8084"
+    environment:
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://admin:admin@eureka-server:8761/eureka/
+      SPRING_CONFIG_IMPORT: optional:configserver:http://admin:admin@config-server:8888
+    depends_on:
+      kafka:
+        condition: service_healthy
+      eureka-server:
+        condition: service_healthy
+      config-server:
+        condition: service_healthy
+    networks:
+      - ecommerce-network
