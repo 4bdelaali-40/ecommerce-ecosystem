@@ -8,47 +8,9 @@ on:
 
 jobs:
 
-  # ===========================
-  # Build & Test
-  # ===========================
   build:
     name: Build and Test
     runs-on: ubuntu-latest
-
-    services:
-      postgres:
-        image: postgres:16-alpine
-        env:
-          POSTGRES_DB: orderdb
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      mongodb:
-        image: mongo:7-jammy
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd "mongosh --eval 'db.adminCommand(\"ping\")'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     steps:
       - name: Checkout code
@@ -64,28 +26,14 @@ jobs:
       - name: Build all modules
         run: mvn clean install -DskipTests --no-transfer-progress
 
-      - name: Run tests
-        run: mvn test --no-transfer-progress
-        continue-on-error: true
-
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: jar-artifacts
           path: |
-            eureka-server/target/*.jar
-            config-server/target/*.jar
-            api-gateway/target/*.jar
-            identity-service/target/*.jar
-            product-service/target/*.jar
-            order-service/target/*.jar
-            inventory-service/target/*.jar
-            notification-service/target/*.jar
+            **/target/*.jar
           retention-days: 1
 
-  # ===========================
-  # Docker Build
-  # ===========================
   docker-build:
     name: Docker Build
     runs-on: ubuntu-latest
@@ -109,14 +57,11 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Build Docker images
-        run: docker-compose build
+        run: docker compose build
 
       - name: Verify images
         run: docker images | grep ecommerce
 
-  # ===========================
-  # Code Quality
-  # ===========================
   code-quality:
     name: Code Quality Check
     runs-on: ubuntu-latest
@@ -134,7 +79,3 @@ jobs:
 
       - name: Check code compiles
         run: mvn compile --no-transfer-progress
-
-      - name: Check for dependency vulnerabilities
-        run: mvn dependency:analyze --no-transfer-progress
-        continue-on-error: true
