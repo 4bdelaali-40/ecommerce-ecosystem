@@ -1,8 +1,6 @@
 package com.ecommerce.identity.controller;
 
-import com.ecommerce.identity.dto.AuthResponse;
-import com.ecommerce.identity.dto.LoginRequest;
-import com.ecommerce.identity.dto.RegisterRequest;
+import com.ecommerce.identity.dto.*;
 import com.ecommerce.identity.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -20,13 +18,25 @@ public class AuthController {
         return ResponseEntity.ok(authService.register(request));
     }
 
+    @PostMapping("/register/admin")
+    public ResponseEntity<AuthResponse> registerAdmin(@RequestBody RegisterRequest request) {
+        return ResponseEntity.ok(authService.registerAdmin(request));
+    }
+
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest request) {
         return ResponseEntity.ok(authService.login(request));
     }
 
-    @PostMapping("/register/admin")
-    public ResponseEntity<AuthResponse> registerAdmin(@RequestBody RegisterRequest request) {
-        return ResponseEntity.ok(authService.registerAdmin(request));
+    @PostMapping("/refresh")
+    public ResponseEntity<TokenRefreshResponse> refresh(
+            @RequestBody TokenRefreshRequest request) {
+        return ResponseEntity.ok(authService.refreshToken(request));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@RequestBody LogoutRequest request) {
+        authService.logout(request);
+        return ResponseEntity.ok().build();
     }
 }

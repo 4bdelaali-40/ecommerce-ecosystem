@@ -1,17 +1,15 @@
 package com.ecommerce.identity.service;
 
-import com.ecommerce.identity.dto.AuthResponse;
-import com.ecommerce.identity.dto.LoginRequest;
-import com.ecommerce.identity.dto.RegisterRequest;
+import com.ecommerce.identity.dto.*;
 import com.ecommerce.identity.entity.User;
+import com.ecommerce.identity.exception.BusinessException;
+import com.ecommerce.identity.exception.ResourceNotFoundException;
 import com.ecommerce.identity.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import com.ecommerce.identity.exception.BusinessException;
-import com.ecommerce.identity.exception.ResourceNotFoundException;
 
 import java.util.Map;
 
@@ -23,6 +21,7 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final AuthenticationManager authenticationManager;
+    private final RefreshTokenService refreshTokenService;
 
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -38,39 +37,7 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
-
-        String token = jwtService.generateToken(
-                user.getEmail(),
-                Map.of("role", user.getRole().name(), "userId", user.getId())
-        );
-
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .role(user.getRole().name())
-                .expiresIn(jwtService.getExpiration())
-                .build();
-    }
-
-    public AuthResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-        );
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        String token = jwtService.generateToken(
-                user.getEmail(),
-                Map.of("role", user.getRole().name(), "userId", user.getId())
-        );
-
-        return AuthResponse.builder()
-                .token(token)
-                .email(user.getEmail())
-                .role(user.getRole().name())
-                .expiresIn(jwtService.getExpiration())
-                .build();
+        return buildAuthResponse(user);
     }
 
     public AuthResponse registerAdmin(RegisterRequest request) {
@@ -87,14 +54,65 @@ public class AuthService {
                 .build();
 
         userRepository.save(user);
+        return buildAuthResponse(user);
+    }
 
-        String token = jwtService.generateToken(
+    public AuthResponse login(LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(
+                        request.getEmail(), request.getPassword())
+        );
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        return buildAuthResponse(user);
+    }
+
+    public TokenRefreshResponse refreshToken(TokenRefreshRequest request) {
+        String email = refreshTokenService.getEmailFromRefreshToken(
+                request.getRefreshToken());
+
+        if (email == null) {
+            throw new BusinessException("Invalid or expired refresh token");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        String newAccessToken = jwtService.generateToken(
                 user.getEmail(),
                 Map.of("role", user.getRole().name(), "userId", user.getId())
         );
 
+        String newRefreshToken = refreshTokenService.generateRefreshToken(email);
+        refreshTokenService.deleteRefreshToken(request.getRefreshToken());
+
+        return TokenRefreshResponse.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshToken)
+                .expiresIn(jwtService.getExpiration())
+                .build();
+    }
+
+    public void logout(LogoutRequest request) {
+        refreshTokenService.blacklistAccessToken(
+                request.getAccessToken(),
+                jwtService.getExpiration()
+        );
+        refreshTokenService.deleteRefreshToken(request.getRefreshToken());
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
+        String accessToken = jwtService.generateToken(
+                user.getEmail(),
+                Map.of("role", user.getRole().name(), "userId", user.getId())
+        );
+        String refreshToken = refreshTokenService.generateRefreshToken(user.getEmail());
+
         return AuthResponse.builder()
-                .token(token)
+                .token(accessToken)
+                .refreshToken(refreshToken)
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .expiresIn(jwtService.getExpiration())
