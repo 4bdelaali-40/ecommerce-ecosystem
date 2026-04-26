@@ -50,6 +50,11 @@ spring:
           predicates:
             - Path=/api/notifications/**
 
+        - id: ai-service
+          uri: lb://ai-service
+          predicates:
+            - Path=/api/ai/**
+
   data:
     redis:
       host: localhost
