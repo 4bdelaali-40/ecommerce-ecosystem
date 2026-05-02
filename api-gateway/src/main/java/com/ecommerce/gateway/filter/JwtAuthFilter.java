@@ -15,7 +15,6 @@ import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.Map;
 
 @Component
 public class JwtAuthFilter implements GlobalFilter, Ordered {
@@ -27,13 +26,6 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
             "/api/auth/login",
             "/api/auth/register",
             "/actuator"
-    );
-
-    private static final Map<String, List<String>> ADMIN_ONLY_PATHS = Map.of(
-            "POST",   List.of("/api/products"),
-            "PUT",    List.of("/api/products"),
-            "DELETE", List.of("/api/products"),
-            "POST",   List.of("/api/inventory")
     );
 
     @Override
@@ -105,5 +97,4 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
     public int getOrder() {
         return -1;
     }
-
 }
