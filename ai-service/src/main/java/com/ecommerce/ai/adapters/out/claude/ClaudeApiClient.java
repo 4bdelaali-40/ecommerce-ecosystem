@@ -18,52 +18,56 @@ import java.util.Map;
 @Slf4j
 public class ClaudeApiClient {
 
-    @Value("${claude.api.key}")
+    @Value("${groq.api.key}")
     private String apiKey;
 
-    @Value("${claude.api.model:claude-3-5-sonnet-20241022}")
+    @Value("${groq.api.model:llama3-8b-8192}")
     private String model;
 
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
-    private static final String CLAUDE_API_URL = "https://api.anthropic.com";
+    private static final String GROQ_API_URL = "https://api.groq.com";
 
     public String sendMessage(String systemPrompt, String userMessage) {
         try {
             WebClient webClient = webClientBuilder
-                    .baseUrl(CLAUDE_API_URL)
+                    .baseUrl(GROQ_API_URL)
                     .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
-                    .defaultHeader("x-api-key", apiKey)
-                    .defaultHeader("anthropic-version", "2023-06-01")
+                    .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
                     .build();
 
-            Map<String, Object> requestBody = Map.of(
-                    "model", model,
-                    "max_tokens", 1024,
-                    "system", systemPrompt,
-                    "messages", List.of(
-                            Map.of("role", "user", "content", userMessage)
-                    )
-            );
+            Map<String, Object> requestBody = new java.util.HashMap<>();
+            requestBody.put("model", model);
+            requestBody.put("messages", List.of(
+                    Map.of("role", "system", "content", systemPrompt),
+                    Map.of("role", "user", "content", userMessage)
+            ));
 
             String response = webClient.post()
-                    .uri("/v1/messages")
+                    .uri("/openai/v1/chat/completions")
                     .bodyValue(requestBody)
                     .retrieve()
+                    .onStatus(status -> status.is4xxClientError(), clientResponse ->
+                            clientResponse.bodyToMono(String.class).flatMap(body -> {
+                                log.error("Groq API error body: {}", body);
+                                return reactor.core.publisher.Mono.error(new RuntimeException("Groq error: " + body));
+                            })
+                    )
                     .bodyToMono(String.class)
                     .block();
 
             JsonNode jsonResponse = objectMapper.readTree(response);
             return jsonResponse
-                    .path("content")
+                    .path("choices")
                     .get(0)
-                    .path("text")
+                    .path("message")
+                    .path("content")
                     .asText();
 
         } catch (Exception e) {
-            log.error("Error calling Claude API: {}", e.getMessage());
-            throw new RuntimeException("Failed to call Claude API", e);
+            log.error("Error calling Groq API: {}", e.getMessage());
+            throw new RuntimeException("Failed to call Groq API", e);
         }
     }
 }
