@@ -2,7 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
     LayoutDashboard, Package, ShoppingCart,
-    Bot, Shield, LogOut
+    Bot, Shield, LogOut, Zap
 } from 'lucide-react';
 
 const navItems = [
@@ -23,25 +23,30 @@ export default function Navbar() {
     };
 
     return (
-        <motion.nav
-            initial={{ y: -100 }}
-            animate={{ y: 0 }}
-            className="fixed top-0 left-0 right-0 z-50 glassmorphism px-6 py-3"
+        <nav
+            className="fixed top-0 left-0 right-0 z-50"
+            style={{
+                background: 'rgba(2, 8, 23, 0.97)',
+                borderBottom: '1px solid rgba(51, 65, 85, 0.5)',
+                backdropFilter: 'blur(20px)',
+                height: '68px',
+            }}
         >
-            <div className="max-w-7xl mx-auto flex items-center justify-between">
-                <motion.div
-                    className="flex items-center gap-2"
-                    whileHover={{ scale: 1.05 }}
-                >
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 flex items-center justify-center">
-                        <span className="text-xs font-bold">E</span>
-                    </div>
-                    <span className="font-bold text-lg bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-            EcoSphere
-          </span>
-                </motion.div>
+            <div className="max-w-7xl mx-auto h-full px-6 flex items-center justify-between gap-4">
 
-                <div className="flex items-center gap-1">
+                {/* Logo */}
+                <Link to="/" className="flex items-center gap-3 flex-shrink-0">
+                    <div
+                        className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #3b82f6, #8b5cf6)', boxShadow: '0 0 20px rgba(59,130,246,0.3)' }}
+                    >
+                        <Zap size={18} className="text-white" />
+                    </div>
+                    <span className="font-bold text-lg text-white hidden sm:block">EcoSphere</span>
+                </Link>
+
+                {/* Nav Links - Center */}
+                <div className="flex items-center gap-1 flex-1 justify-center">
                     {navItems.map((item) => {
                         const isActive = location.pathname === item.path;
                         return (
@@ -49,30 +54,37 @@ export default function Navbar() {
                                 <motion.div
                                     whileHover={{ scale: 1.05 }}
                                     whileTap={{ scale: 0.95 }}
-                                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-all ${
-                                        isActive
-                                            ? 'bg-blue-600/30 text-blue-400 border border-blue-500/30'
-                                            : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
-                                    }`}
+                                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all"
+                                    style={{
+                                        background: isActive ? 'rgba(59, 130, 246, 0.2)' : 'transparent',
+                                        color: isActive ? '#60a5fa' : '#94a3b8',
+                                        border: isActive ? '1px solid rgba(59, 130, 246, 0.4)' : '1px solid transparent',
+                                    }}
                                 >
                                     <item.icon size={16} />
-                                    <span className="hidden md:block">{item.label}</span>
+                                    <span className="hidden lg:block whitespace-nowrap">{item.label}</span>
                                 </motion.div>
                             </Link>
                         );
                     })}
                 </div>
 
+                {/* Logout */}
                 <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     onClick={handleLogout}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-900/20 transition-all"
+                    className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white flex-shrink-0"
+                    style={{
+                        background: 'rgba(239, 68, 68, 0.15)',
+                        border: '1px solid rgba(239, 68, 68, 0.4)',
+                        color: '#f87171',
+                    }}
                 >
-                    <LogOut size={16} />
-                    <span className="hidden md:block">Logout</span>
+                    <LogOut size={15} />
+                    <span className="hidden sm:block">Logout</span>
                 </motion.button>
             </div>
-        </motion.nav>
+        </nav>
     );
 }

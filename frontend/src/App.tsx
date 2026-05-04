@@ -15,40 +15,20 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(
-      !!localStorage.getItem('token')
-  );
-
-  useEffect(() => {
-    const handleStorage = () => {
-      setIsAuthenticated(!!localStorage.getItem('token'));
-    };
-    window.addEventListener('storage', handleStorage);
-    return () => window.removeEventListener('storage', handleStorage);
-  }, []);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!localStorage.getItem('token'));
 
   return (
       <BrowserRouter>
-        <div className="min-h-screen relative">
+        <div style={{ minHeight: '100vh', background: '#020817' }}>
           <ParticleBackground />
           {isAuthenticated && <Navbar />}
           <Routes>
             <Route path="/login" element={<Login onLogin={() => setIsAuthenticated(true)} />} />
-            <Route path="/" element={
-              <PrivateRoute><MissionControl /></PrivateRoute>
-            } />
-            <Route path="/products" element={
-              <PrivateRoute><ProductExplorer /></PrivateRoute>
-            } />
-            <Route path="/orders" element={
-              <PrivateRoute><OrderTracker /></PrivateRoute>
-            } />
-            <Route path="/ai" element={
-              <PrivateRoute><AiCommandCenter /></PrivateRoute>
-            } />
-            <Route path="/admin" element={
-              <PrivateRoute><AdminPanel /></PrivateRoute>
-            } />
+            <Route path="/" element={<PrivateRoute><MissionControl /></PrivateRoute>} />
+            <Route path="/products" element={<PrivateRoute><ProductExplorer /></PrivateRoute>} />
+            <Route path="/orders" element={<PrivateRoute><OrderTracker /></PrivateRoute>} />
+            <Route path="/ai" element={<PrivateRoute><AiCommandCenter /></PrivateRoute>} />
+            <Route path="/admin" element={<PrivateRoute><AdminPanel /></PrivateRoute>} />
           </Routes>
         </div>
       </BrowserRouter>
