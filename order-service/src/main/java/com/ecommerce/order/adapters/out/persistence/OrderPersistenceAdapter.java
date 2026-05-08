@@ -84,4 +84,11 @@ public class OrderPersistenceAdapter implements OrderRepositoryPort {
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }
+
+    @Override
+    public List<Order> findAll() {
+        return repository.findAll().stream()
+                .map(this::toDomain)
+                .collect(Collectors.toList());
+    }
 }

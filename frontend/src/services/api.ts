@@ -4,22 +4,19 @@ const API_BASE_URL = 'http://localhost:8080';
 
 const api = axios.create({
     baseURL: API_BASE_URL,
-    headers: {
-        'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
+    timeout: 5000,
 });
 
 api.interceptors.request.use((config) => {
     const token = localStorage.getItem('token');
-    if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-    }
+    if (token) config.headers.Authorization = `Bearer ${token}`;
     return config;
 });
 
 api.interceptors.response.use(
-    (response) => response,
-    (error) => {
+    response => response,
+    error => {
         if (error.response?.status === 401) {
             localStorage.removeItem('token');
             window.location.href = '/login';
@@ -50,12 +47,12 @@ export const orderApi = {
     getAll: (userId: string) => api.get(`/api/orders/user/${userId}`),
     getById: (id: string) => api.get(`/api/orders/${id}`),
     create: (data: any) => api.post('/api/orders', data),
+    getAllOrders: () => api.get('/api/orders'),
 };
 
 export const inventoryApi = {
     getByProduct: (productId: string) => api.get(`/api/inventory/${productId}`),
-    isAvailable: (productId: string, quantity: number) =>
-        api.get(`/api/inventory/${productId}/available?quantity=${quantity}`),
+    getAll: () => api.get('/api/inventory'),
 };
 
 export const aiApi = {
@@ -67,6 +64,18 @@ export const aiApi = {
         api.post('/api/ai/recommendations', data),
     predictInventory: (data: any) =>
         api.post('/api/ai/inventory/predict', data),
+};
+
+// Health check direct pour chaque service
+export const healthApi = {
+    checkService: async (port: number): Promise<boolean> => {
+        try {
+            const response = await axios.get(`http://localhost:${port}/actuator/health`, { timeout: 2000 });
+            return response.data?.status === 'UP';
+        } catch {
+            return false;
+        }
+    }
 };
 
 export default api;

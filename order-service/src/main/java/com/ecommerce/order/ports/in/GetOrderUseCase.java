@@ -7,4 +7,5 @@ import java.util.List;
 public interface GetOrderUseCase {
     Order getOrderById(Long id);
     List<Order> getOrdersByUserId(String userId);
+    List<Order> getAllOrders();
 }

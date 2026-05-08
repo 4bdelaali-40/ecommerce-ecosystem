@@ -20,25 +20,20 @@ export default function Login({ onLogin }: LoginProps) {
             const response = isRegister
                 ? await authApi.register(form)
                 : await authApi.login(form.email, form.password);
+
+            console.log('Login response:', response.data); // ← AJOUTE ÇA
+
             const { token, userId } = response.data;
             localStorage.setItem('token', token);
             if (userId) localStorage.setItem('userId', userId);
             onLogin();
             window.location.href = '/';
         } catch (err: any) {
+            console.log('Login error:', err.response); // ← ET ÇA
             setError(err.response?.data?.message || 'Authentication failed. Please check your credentials.');
         } finally {
             setLoading(false);
         }
-    };
-
-    const inputStyle = {
-        width: '100%', padding: '12px 16px',
-        background: 'rgba(30,41,59,0.8)',
-        border: '1px solid rgba(71,85,105,0.6)',
-        borderRadius: '12px', color: 'white', fontSize: '14px',
-        outline: 'none', boxSizing: 'border-box' as const,
-        transition: 'border-color 0.2s',
     };
 
     const labelStyle = {

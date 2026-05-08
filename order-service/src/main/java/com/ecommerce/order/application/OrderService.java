@@ -47,4 +47,9 @@ public class OrderService implements PlaceOrderUseCase, GetOrderUseCase {
     public List<Order> getOrdersByUserId(String userId) {
         return orderRepositoryPort.findByUserId(userId);
     }
+
+    @Override
+    public List<Order> getAllOrders() {
+        return orderRepositoryPort.findAll();
+    }
 }
