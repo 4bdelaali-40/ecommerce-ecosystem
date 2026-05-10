@@ -68,12 +68,12 @@ export const aiApi = {
 
 // Health check direct pour chaque service
 export const healthApi = {
-    checkService: async (port: number): Promise<boolean> => {
+    checkAllServices: async (): Promise<Record<string, boolean>> => {
         try {
-            const response = await axios.get(`http://localhost:${port}/actuator/health`, { timeout: 2000 });
-            return response.data?.status === 'UP';
+            const r = await api.get('/api/health/services', { timeout: 10000 });
+            return r.data;
         } catch {
-            return false;
+            return {};
         }
     }
 };

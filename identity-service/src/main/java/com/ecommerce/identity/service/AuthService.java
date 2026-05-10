@@ -113,6 +113,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .token(accessToken)
                 .refreshToken(refreshToken)
+                .userId(user.getId())   // ← AJOUTER
                 .email(user.getEmail())
                 .role(user.getRole().name())
                 .expiresIn(jwtService.getExpiration())

@@ -1,29 +1,9 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-    ShoppingCart, Package, Truck, CheckCircle,
-    Clock, ChevronDown, ChevronUp, RefreshCw,
-    AlertCircle, Plus
-} from 'lucide-react';
+import { ShoppingCart, Package, Truck, CheckCircle, Clock, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react';
 import { orderApi } from '../services/api';
 
-interface OrderItem {
-    id?: number;
-    productId: string;
-    productName: string;
-    quantity: number;
-    price: number;
-}
-
-interface Order {
-    id: number;
-    userId: string;
-    status: string;
-    totalAmount: number;
-    createdAt: string;
-    updatedAt?: string;
-    items: OrderItem[];
-}
+interface OrderItem { productId: string; productName: string; quantity: number; price: number; }
+interface Order { id: number; userId: string; status: string; totalAmount: number; createdAt: string; items: OrderItem[]; }
 
 const steps = [
     { key: 'PENDING', label: 'Placed', icon: ShoppingCart },
@@ -32,340 +12,228 @@ const steps = [
     { key: 'DELIVERED', label: 'Delivered', icon: CheckCircle },
 ];
 
-const statusColors: Record<string, string> = {
-    PENDING: '#3b82f6',
-    PROCESSING: '#f59e0b',
-    CONFIRMED: '#06b6d4',
-    SHIPPED: '#8b5cf6',
-    DELIVERED: '#10b981',
-    CANCELLED: '#ef4444',
-};
-
-const statusToStep: Record<string, number> = {
-    PENDING: 0,
-    PROCESSING: 1,
-    CONFIRMED: 1,
-    SHIPPED: 2,
-    DELIVERED: 3,
-    CANCELLED: 0,
+const statusConfig: Record<string, { color: string; bg: string; border: string; step: number }> = {
+    PENDING:    { color: 'var(--accent)',   bg: 'var(--accent-light)',   border: 'var(--accent)',   step: 0 },
+    PROCESSING: { color: 'var(--warning)',  bg: 'var(--warning-light)',  border: 'var(--warning)',  step: 1 },
+    CONFIRMED:  { color: 'var(--accent)',   bg: 'var(--accent-light)',   border: 'var(--accent)',   step: 1 },
+    SHIPPED:    { color: 'var(--purple)',   bg: 'var(--purple-light)',   border: 'var(--purple)',   step: 2 },
+    DELIVERED:  { color: 'var(--success)',  bg: 'var(--success-light)',  border: 'var(--success)',  step: 3 },
+    CANCELLED:  { color: 'var(--danger)',   bg: 'var(--danger-light)',   border: 'var(--danger)',   step: 0 },
 };
 
 export default function OrderTracker() {
     const [orders, setOrders] = useState<Order[]>([]);
-    const [expanded, setExpanded] = useState<string | null>(null);
+    const [expanded, setExpanded] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [refreshing, setRefreshing] = useState(false);
 
     const fetchOrders = async () => {
         const userId = localStorage.getItem('userId');
-        if (!userId) {
-            setError('User not identified. Please login again.');
-            setLoading(false);
-            return;
-        }
+        if (!userId) { setError('User not identified. Please login again.'); setLoading(false); return; }
         try {
-            const response = await orderApi.getAll(userId);
-            const data = response.data || [];
+            const res = await orderApi.getAll(userId);
+            const data = res.data || [];
             setOrders(data);
-            if (data.length > 0) setExpanded(String(data[0].id));
+            if (data.length > 0) setExpanded(data[0].id);
             setError('');
         } catch (err: any) {
-            if (err.response?.status === 404) {
-                setOrders([]);
-            } else {
-                setError('Unable to load orders. Make sure the order service is running.');
-            }
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
-        }
+            if (err.response?.status !== 404) setError('Unable to load orders. Make sure the order service is running.');
+        } finally { setLoading(false); setRefreshing(false); }
     };
 
     useEffect(() => { fetchOrders(); }, []);
 
-    const handleRefresh = async () => {
-        setRefreshing(true);
-        await fetchOrders();
-    };
+    const handleRefresh = () => { setRefreshing(true); fetchOrders(); };
 
-    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
+    const totalSpent = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
 
     return (
-        <div className="page-container">
-            <div style={{ maxWidth: '860px', margin: '0 auto' }}>
+        <div style={{ padding: '80px 24px 40px', maxWidth: '860px', margin: '0 auto' }}>
 
-                {/* Header */}
-                <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} style={{ marginBottom: '32px' }}>
-                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                        <div>
-                            <h1 style={{ fontSize: '32px', fontWeight: 800, color: 'white', margin: 0 }}>Order Tracker</h1>
-                            <p style={{ color: '#64748b', fontSize: '14px', marginTop: '6px' }}>
-                                Track all your orders in real-time
-                            </p>
-                        </div>
-                        <motion.button
-                            whileHover={{ scale: 1.05 }}
-                            whileTap={{ scale: 0.95 }}
-                            onClick={handleRefresh}
-                            disabled={refreshing}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '6px',
-                                padding: '10px 18px',
-                                background: 'rgba(30,41,59,0.7)', border: '1px solid rgba(51,65,85,0.5)',
-                                borderRadius: '12px', color: '#94a3b8', fontSize: '13px',
-                                fontWeight: 600, cursor: refreshing ? 'not-allowed' : 'pointer',
-                            }}
-                        >
-                            <RefreshCw size={14} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
-                            {refreshing ? 'Refreshing...' : 'Refresh'}
-                        </motion.button>
-                    </div>
-                </motion.div>
-
-                {/* Stats */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '14px', marginBottom: '28px' }}>
-                    {[
-                        { label: 'Total Orders', value: orders.length, color: '#3b82f6' },
-                        { label: 'In Transit', value: orders.filter(o => o.status === 'SHIPPED').length, color: '#8b5cf6' },
-                        { label: 'Delivered', value: orders.filter(o => o.status === 'DELIVERED').length, color: '#10b981' },
-                        { label: 'Total Spent', value: `$${totalRevenue.toFixed(2)}`, color: '#f59e0b' },
-                    ].map((s, i) => (
-                        <motion.div key={s.label}
-                                    initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.08 }}
-                                    style={{
-                                        padding: '18px 20px', borderRadius: '18px',
-                                        background: s.color + '10', border: `1px solid ${s.color}25`,
-                                        textAlign: 'center',
-                                    }}
-                        >
-                            <div style={{ fontSize: '26px', fontWeight: 800, color: s.color }}>{s.value}</div>
-                            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px', fontWeight: 500 }}>{s.label}</div>
-                        </motion.div>
-                    ))}
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <div>
+                    <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Orders</h1>
+                    <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>Track your order history</p>
                 </div>
-
-                {/* Error */}
-                {error && (
-                    <div style={{
-                        display: 'flex', alignItems: 'center', gap: '10px',
-                        padding: '14px 18px', marginBottom: '20px',
-                        background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)',
-                        borderRadius: '14px', color: '#f87171', fontSize: '14px',
-                    }}>
-                        <AlertCircle size={16} />
-                        {error}
-                    </div>
-                )}
-
-                {/* Loading */}
-                {loading ? (
-                    <div style={{ textAlign: 'center', padding: '80px 20px' }}>
-                        <div style={{ width: '40px', height: '40px', border: '3px solid rgba(59,130,246,0.2)', borderTop: '3px solid #3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 16px' }} />
-                        <p style={{ color: '#64748b', fontSize: '14px' }}>Loading your orders...</p>
-                    </div>
-                ) : orders.length === 0 && !error ? (
-                    /* Empty State */
-                    <div style={{
-                        textAlign: 'center', padding: '80px 20px',
-                        background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(51,65,85,0.5)',
-                        borderRadius: '24px',
-                    }}>
-                        <ShoppingCart size={52} style={{ color: '#1e293b', margin: '0 auto 16px', display: 'block' }} />
-                        <h3 style={{ fontSize: '18px', fontWeight: 700, color: '#475569', margin: '0 0 8px' }}>No orders yet</h3>
-                        <p style={{ color: '#334155', fontSize: '14px', margin: '0 0 24px' }}>
-                            Start shopping to see your orders here
-                        </p>
-                        <div style={{
-                            display: 'inline-flex', alignItems: 'center', gap: '8px',
-                            padding: '10px 20px',
-                            background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)',
-                            borderRadius: '12px', color: '#60a5fa', fontSize: '14px', fontWeight: 600,
+                <button onClick={handleRefresh} disabled={refreshing}
+                        style={{
+                            display: 'flex', alignItems: 'center', gap: '6px',
+                            padding: '8px 14px', borderRadius: 'var(--radius-md)',
+                            border: '1px solid var(--border)', background: 'var(--bg-card)',
+                            color: 'var(--text-secondary)', fontSize: '13px', cursor: 'pointer',
                         }}>
-                            <Plus size={15} />
-                            Browse Products to Order
-                        </div>
+                    <RefreshCw size={13} style={{ animation: refreshing ? 'spin 1s linear infinite' : 'none' }} />
+                    Refresh
+                </button>
+            </div>
+
+            {/* Stats */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px', marginBottom: '24px' }}>
+                {[
+                    { label: 'Total', value: orders.length },
+                    { label: 'In Transit', value: orders.filter(o => o.status === 'SHIPPED').length },
+                    { label: 'Delivered', value: orders.filter(o => o.status === 'DELIVERED').length },
+                    { label: 'Spent', value: `$${totalSpent.toFixed(2)}` },
+                ].map(s => (
+                    <div key={s.label} style={{
+                        background: 'var(--bg-card)', border: '1px solid var(--border)',
+                        borderRadius: 'var(--radius-lg)', padding: '16px', textAlign: 'center',
+                    }}>
+                        <div style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>{s.value}</div>
+                        <div style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>{s.label}</div>
                     </div>
-                ) : (
-                    /* Orders List */
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                        {orders.map((order, i) => {
-                            const statusIdx = statusToStep[order.status] ?? 0;
-                            const color = statusColors[order.status] || '#3b82f6';
-                            const isOpen = expanded === String(order.id);
+                ))}
+            </div>
 
-                            return (
-                                <motion.div key={order.id}
-                                            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.08 }}
-                                            style={{
-                                                background: 'rgba(15,23,42,0.85)',
-                                                border: `1px solid ${isOpen ? color + '40' : 'rgba(51,65,85,0.5)'}`,
-                                                borderRadius: '20px', overflow: 'hidden',
-                                                transition: 'border-color 0.3s',
-                                            }}
-                                >
-                                    {/* Order Header */}
-                                    <div
-                                        onClick={() => setExpanded(isOpen ? null : String(order.id))}
-                                        style={{
-                                            padding: '20px 24px', cursor: 'pointer',
-                                            display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
-                                        }}
-                                    >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                                            <div style={{
-                                                width: '46px', height: '46px', borderRadius: '14px', flexShrink: 0,
-                                                background: color + '15', border: `1px solid ${color}35`,
-                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            }}>
-                                                <ShoppingCart size={19} style={{ color }} />
-                                            </div>
-                                            <div>
-                                                <div style={{ fontWeight: 700, color: 'white', fontSize: '15px' }}>
-                                                    Order #{order.id}
-                                                </div>
-                                                <div style={{ fontSize: '12px', color: '#64748b', marginTop: '3px' }}>
-                                                    {order.createdAt
-                                                        ? new Date(order.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                                        : 'Date unknown'
-                                                    }
-                                                </div>
-                                            </div>
+            {/* Error */}
+            {error && (
+                <div style={{
+                    display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px',
+                    padding: '12px 16px', background: 'var(--danger-light)',
+                    border: '1px solid var(--danger)', borderRadius: 'var(--radius-md)',
+                    color: 'var(--danger)', fontSize: '13px',
+                }}>
+                    <AlertCircle size={15} /> {error}
+                </div>
+            )}
+
+            {/* Loading */}
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}>
+                    <div className="spinner" style={{ margin: '0 auto 12px' }} />
+                    <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>Loading orders...</p>
+                </div>
+            ) : orders.length === 0 && !error ? (
+                <div style={{
+                    textAlign: 'center', padding: '60px',
+                    background: 'var(--bg-card)', border: '1px solid var(--border)',
+                    borderRadius: 'var(--radius-lg)',
+                }}>
+                    <ShoppingCart size={40} style={{ color: 'var(--border-strong)', margin: '0 auto 12px', display: 'block' }} />
+                    <p style={{ fontSize: '15px', fontWeight: 500, color: 'var(--text-secondary)', margin: '0 0 4px' }}>No orders yet</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>Browse products to place your first order</p>
+                </div>
+            ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    {orders.map(order => {
+                        const cfg = statusConfig[order.status] || statusConfig['PENDING'];
+                        const isOpen = expanded === order.id;
+                        return (
+                            <div key={order.id} style={{
+                                background: 'var(--bg-card)', border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                            }}>
+                                {/* Header */}
+                                <div onClick={() => setExpanded(isOpen ? null : order.id)}
+                                     style={{
+                                         padding: '16px 20px', cursor: 'pointer',
+                                         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px',
+                                     }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                                        <div style={{
+                                            width: '38px', height: '38px', borderRadius: 'var(--radius-md)', flexShrink: 0,
+                                            background: cfg.bg, border: `1px solid ${cfg.border}`,
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}>
+                                            <ShoppingCart size={16} style={{ color: cfg.color }} />
                                         </div>
-
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexShrink: 0 }}>
-                      <span style={{
-                          padding: '5px 14px', borderRadius: '20px',
-                          fontSize: '12px', fontWeight: 700,
-                          background: color + '15', color,
-                          border: `1px solid ${color}35`,
-                      }}>
-                        {order.status}
-                      </span>
-                                            <span style={{ fontSize: '18px', fontWeight: 800, color: '#60a5fa' }}>
-                        ${order.totalAmount?.toFixed(2) || '0.00'}
-                      </span>
-                                            <div style={{ color: '#475569' }}>
-                                                {isOpen ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+                                        <div>
+                                            <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)' }}>Order #{order.id}</div>
+                                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+                                                {order.createdAt ? new Date(order.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                                             </div>
                                         </div>
                                     </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 }}>
+                    <span style={{
+                        padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: 500,
+                        background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}`,
+                    }}>{order.status}</span>
+                                        <span style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      ${order.totalAmount?.toFixed(2)}
+                    </span>
+                                        {isOpen ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
+                                    </div>
+                                </div>
 
-                                    {/* Order Details */}
-                                    <AnimatePresence>
-                                        {isOpen && (
-                                            <motion.div
-                                                initial={{ height: 0, opacity: 0 }}
-                                                animate={{ height: 'auto', opacity: 1 }}
-                                                exit={{ height: 0, opacity: 0 }}
-                                                transition={{ duration: 0.3 }}
-                                                style={{ borderTop: '1px solid rgba(51,65,85,0.4)', overflow: 'hidden' }}
-                                            >
-                                                <div style={{ padding: '24px' }}>
+                                {/* Details */}
+                                {isOpen && (
+                                    <div style={{ borderTop: '1px solid var(--border)', padding: '20px' }}>
 
-                                                    {/* Progress Timeline */}
-                                                    <div style={{ marginBottom: '28px' }}>
-                                                        <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', margin: '0 0 20px' }}>
-                                                            ORDER PROGRESS
-                                                        </p>
-                                                        <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between' }}>
-                                                            {/* Background line */}
-                                                            <div style={{ position: 'absolute', top: '20px', left: '20px', right: '20px', height: '2px', background: 'rgba(51,65,85,0.6)' }} />
-                                                            {/* Progress line */}
+                                        {/* Progress */}
+                                        <div style={{ marginBottom: '24px' }}>
+                                            <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.06em', margin: '0 0 16px' }}>PROGRESS</p>
+                                            <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between' }}>
+                                                <div style={{ position: 'absolute', top: '18px', left: '18px', right: '18px', height: '1px', background: 'var(--border)' }} />
+                                                <div style={{
+                                                    position: 'absolute', top: '18px', left: '18px', height: '1px',
+                                                    width: `${(cfg.step / (steps.length - 1)) * 100}%`,
+                                                    background: cfg.color, transition: 'width 0.5s',
+                                                }} />
+                                                {steps.map((step, si) => {
+                                                    const done = si <= cfg.step;
+                                                    return (
+                                                        <div key={step.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
                                                             <div style={{
-                                                                position: 'absolute', top: '20px', left: '20px', height: '2px',
-                                                                width: `${(statusIdx / (steps.length - 1)) * (100 - (40 / steps.length))}%`,
-                                                                background: order.status === 'CANCELLED' ? '#ef4444' : color,
-                                                                transition: 'width 0.6s ease',
-                                                            }} />
-
-                                                            {steps.map((step, si) => {
-                                                                const done = si <= statusIdx && order.status !== 'CANCELLED';
-                                                                const curr = si === statusIdx;
-                                                                return (
-                                                                    <div key={step.key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1 }}>
-                                                                        <motion.div
-                                                                            animate={curr && order.status !== 'CANCELLED' ? { scale: [1, 1.12, 1] } : {}}
-                                                                            transition={{ duration: 1.5, repeat: Infinity }}
-                                                                            style={{
-                                                                                width: '40px', height: '40px', borderRadius: '50%',
-                                                                                background: done ? color + '20' : 'rgba(15,23,42,0.9)',
-                                                                                border: `2px solid ${done ? color : 'rgba(51,65,85,0.5)'}`,
-                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                                transition: 'all 0.3s',
-                                                                            }}
-                                                                        >
-                                                                            <step.icon size={16} style={{ color: done ? color : '#374151' }} />
-                                                                        </motion.div>
-                                                                        <span style={{
-                                                                            fontSize: '11px', fontWeight: 600, marginTop: '8px',
-                                                                            color: done ? color : '#374151', textAlign: 'center',
-                                                                        }}>
-                                      {step.label}
-                                    </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Items */}
-                                                    <div>
-                                                        <p style={{ fontSize: '11px', fontWeight: 700, color: '#64748b', letterSpacing: '0.08em', margin: '0 0 12px' }}>
-                                                            ORDER ITEMS ({order.items?.length || 0})
-                                                        </p>
-                                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                                            {(order.items || []).map((item, idx) => (
-                                                                <div key={idx} style={{
-                                                                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                                                    padding: '12px 16px',
-                                                                    background: 'rgba(30,41,59,0.5)', borderRadius: '12px',
-                                                                    border: '1px solid rgba(51,65,85,0.4)',
-                                                                }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                                                                        <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                                                            <Package size={14} style={{ color: '#60a5fa' }} />
-                                                                        </div>
-                                                                        <div>
-                                                                            <p style={{ fontSize: '14px', color: 'white', fontWeight: 600, margin: 0 }}>{item.productName}</p>
-                                                                            <p style={{ fontSize: '12px', color: '#64748b', margin: '2px 0 0' }}>Qty: {item.quantity}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div style={{ textAlign: 'right' }}>
-                                                                        <p style={{ fontSize: '15px', fontWeight: 700, color: '#60a5fa', margin: 0 }}>
-                                                                            ${(item.price * item.quantity).toFixed(2)}
-                                                                        </p>
-                                                                        <p style={{ fontSize: '11px', color: '#64748b', margin: '2px 0 0' }}>
-                                                                            ${item.price.toFixed(2)} each
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            ))}
-                                                        </div>
-
-                                                        {/* Total */}
-                                                        <div style={{
-                                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                                                            marginTop: '16px', padding: '14px 16px',
-                                                            background: color + '10', borderRadius: '12px',
-                                                            border: `1px solid ${color}25`,
-                                                        }}>
-                                                            <span style={{ fontSize: '14px', fontWeight: 600, color: '#94a3b8' }}>Order Total</span>
-                                                            <span style={{ fontSize: '20px', fontWeight: 800, color }}>
-                                ${order.totalAmount?.toFixed(2) || '0.00'}
+                                                                width: '36px', height: '36px', borderRadius: '50%',
+                                                                background: done ? cfg.bg : 'var(--bg-secondary)',
+                                                                border: `1.5px solid ${done ? cfg.color : 'var(--border)'}`,
+                                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                            }}>
+                                                                <step.icon size={14} style={{ color: done ? cfg.color : 'var(--text-muted)' }} />
+                                                            </div>
+                                                            <span style={{ fontSize: '11px', marginTop: '6px', fontWeight: done ? 500 : 400, color: done ? cfg.color : 'var(--text-muted)' }}>
+                                {step.label}
                               </span>
                                                         </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+
+                                        {/* Items */}
+                                        <p style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', letterSpacing: '0.06em', margin: '0 0 10px' }}>
+                                            ITEMS ({order.items?.length || 0})
+                                        </p>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                                            {(order.items || []).map((item, idx) => (
+                                                <div key={idx} style={{
+                                                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                                    padding: '10px 14px',
+                                                    background: 'var(--bg-secondary)', borderRadius: 'var(--radius-md)',
+                                                    border: '1px solid var(--border)',
+                                                }}>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                        <Package size={14} style={{ color: 'var(--text-muted)' }} />
+                                                        <span style={{ fontSize: '13px', color: 'var(--text-primary)', fontWeight: 500 }}>{item.productName}</span>
+                                                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>×{item.quantity}</span>
                                                     </div>
+                                                    <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                            ${(item.price * item.quantity).toFixed(2)}
+                          </span>
                                                 </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </motion.div>
-                            );
-                        })}
-                    </div>
-                )}
-            </div>
+                                            ))}
+                                        </div>
+
+                                        {/* Total */}
+                                        <div style={{
+                                            display: 'flex', justifyContent: 'space-between',
+                                            padding: '12px 14px',
+                                            background: cfg.bg, borderRadius: 'var(--radius-md)',
+                                            border: `1px solid ${cfg.border}`,
+                                        }}>
+                                            <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>Total</span>
+                                            <span style={{ fontSize: '16px', fontWeight: 600, color: cfg.color }}>${order.totalAmount?.toFixed(2)}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Package, Star, ShoppingCart, Sparkles, Check, X } from 'lucide-react';
 import { productApi, aiApi, orderApi } from '../services/api';
 
@@ -9,327 +8,260 @@ interface Product {
 }
 
 const mockProducts: Product[] = [
-    { id: '1', name: 'Quantum Laptop Pro', description: 'Ultra-fast computing power for professionals', price: 1299.99, category: 'Electronics', stockQuantity: 15 },
-    { id: '2', name: 'Neural Headphones X', description: 'AI-enhanced immersive audio experience', price: 299.99, category: 'Electronics', stockQuantity: 42 },
-    { id: '3', name: 'HoloDesk Monitor', description: '4K holographic display technology', price: 899.99, category: 'Electronics', stockQuantity: 8 },
+    { id: '1', name: 'Quantum Laptop Pro', description: 'Ultra-fast computing for professionals', price: 1299.99, category: 'Electronics', stockQuantity: 15 },
+    { id: '2', name: 'Neural Headphones X', description: 'AI-enhanced immersive audio', price: 299.99, category: 'Electronics', stockQuantity: 42 },
+    { id: '3', name: 'HoloDesk Monitor', description: '4K display technology', price: 899.99, category: 'Electronics', stockQuantity: 8 },
     { id: '4', name: 'CyberMouse Elite', description: 'Precision tracking at 25600 DPI', price: 79.99, category: 'Accessories', stockQuantity: 120 },
-    { id: '5', name: 'Fusion Keyboard MX', description: 'Mechanical switches with RGB lighting', price: 149.99, category: 'Accessories', stockQuantity: 67 },
-    { id: '6', name: 'CloudStorage Hub', description: '2TB portable NVMe storage solution', price: 199.99, category: 'Storage', stockQuantity: 34 },
+    { id: '5', name: 'Fusion Keyboard MX', description: 'Mechanical switches with RGB', price: 149.99, category: 'Accessories', stockQuantity: 67 },
+    { id: '6', name: 'CloudStorage Hub', description: '2TB portable NVMe storage', price: 199.99, category: 'Storage', stockQuantity: 34 },
 ];
 
 const categories = ['All', 'Electronics', 'Accessories', 'Storage'];
 
 export default function ProductExplorer() {
     const [products, setProducts] = useState<Product[]>(mockProducts);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState('All');
-    const [isAiSearching, setIsAiSearching] = useState(false);
-    const [aiSearchResult, setAiSearchResult] = useState('');
-    const [orderingProduct, setOrderingProduct] = useState<string | null>(null);
-    const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState('All');
+    const [aiSearching, setAiSearching] = useState(false);
+    const [aiResult, setAiResult] = useState('');
+    const [ordering, setOrdering] = useState<string | null>(null);
+    const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
     useEffect(() => {
-        productApi.getAll()
-            .then(r => { if (r.data?.length) setProducts(r.data); })
-            .catch(() => {});
+        productApi.getAll().then(r => { if (r.data?.length) setProducts(r.data); }).catch(() => {});
     }, []);
 
-    const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
-        setToast({ msg, type });
-        setTimeout(() => setToast(null), 3500);
+    const showToast = (msg: string, ok = true) => {
+        setToast({ msg, ok });
+        setTimeout(() => setToast(null), 3000);
     };
 
     const handleAiSearch = async () => {
-        if (!searchQuery.trim()) return;
-        setIsAiSearching(true);
-        setAiSearchResult('');
+        if (!search.trim()) return;
+        setAiSearching(true); setAiResult('');
         try {
-            const names = products.map(p => p.name).join(', ');
-            const r = await aiApi.search(searchQuery, names);
-            setAiSearchResult(r.data);
-        } catch {
-            setAiSearchResult('AI search unavailable. Showing filtered results.');
-        } finally {
-            setIsAiSearching(false);
-        }
+            const r = await aiApi.search(search, products.map(p => p.name).join(', '));
+            setAiResult(r.data);
+        } catch { setAiResult('AI search unavailable.'); }
+        finally { setAiSearching(false); }
     };
 
-    const handleBuyNow = async (product: Product) => {
+    const handleBuy = async (product: Product) => {
         const userId = localStorage.getItem('userId');
-        if (!userId) {
-            showToast('Please login to place an order', 'error');
-            return;
-        }
-
-        setOrderingProduct(product.id);
+        if (!userId) return showToast('Please login first', false);
+        setOrdering(product.id);
         try {
-            await orderApi.create({
-                userId,
-                items: [{
-                    productId: product.id,
-                    productName: product.name,
-                    quantity: 1,
-                    price: product.price,
-                }]
-            });
-            showToast(` Order placed for ${product.name}!`);
-        } catch (err: any) {
-            showToast(err.response?.data?.message || 'Failed to place order', 'error');
-        } finally {
-            setOrderingProduct(null);
-        }
+            await orderApi.create({ userId, items: [{ productId: product.id, productName: product.name, quantity: 1, price: product.price }] });
+            showToast(`Order placed for ${product.name}!`);
+        } catch { showToast('Failed to place order', false); }
+        finally { setOrdering(null); }
     };
 
     const filtered = products.filter(p => {
-        const cat = selectedCategory === 'All' || p.category === selectedCategory;
-        const q = !searchQuery ||
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            p.description.toLowerCase().includes(searchQuery.toLowerCase());
-        return cat && q;
+        const matchCat = category === 'All' || p.category === category;
+        const matchQ = !search || p.name.toLowerCase().includes(search.toLowerCase()) || p.description.toLowerCase().includes(search.toLowerCase());
+        return matchCat && matchQ;
     });
 
     return (
-        <div className="page-container">
-            <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        <div style={{ padding: '80px 24px 40px', maxWidth: '1200px', margin: '0 auto' }}>
 
-                {/* Toast */}
-                <AnimatePresence>
-                    {toast && (
-                        <motion.div
-                            initial={{ opacity: 0, y: -20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
+            {/* Toast */}
+            {toast && (
+                <div style={{
+                    position: 'fixed', top: '72px', right: '24px', zIndex: 200,
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '10px 16px', borderRadius: 'var(--radius-md)',
+                    background: toast.ok ? 'var(--success-light)' : 'var(--danger-light)',
+                    border: `1px solid ${toast.ok ? 'var(--success)' : 'var(--danger)'}`,
+                    color: toast.ok ? 'var(--success)' : 'var(--danger)',
+                    fontSize: '14px', fontWeight: 500,
+                    boxShadow: 'var(--shadow-md)',
+                }}>
+                    {toast.ok ? <Check size={15} /> : <X size={15} />}
+                    {toast.msg}
+                </div>
+            )}
+
+            {/* Header */}
+            <div style={{ marginBottom: '24px' }}>
+                <h1 style={{ fontSize: '22px', fontWeight: 600, color: 'var(--text-primary)', margin: '0 0 4px' }}>Products</h1>
+                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: 0 }}>Browse and order with AI-powered search</p>
+            </div>
+
+            {/* Search */}
+            <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', padding: '16px', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ flex: 1, position: 'relative' }}>
+                        <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                        <input
+                            type="text" placeholder="Search products or try 'fast laptop for gaming'..."
+                            value={search} onChange={e => setSearch(e.target.value)}
+                            onKeyDown={e => e.key === 'Enter' && handleAiSearch()}
                             style={{
-                                position: 'fixed', top: '84px', right: '24px', zIndex: 100,
-                                display: 'flex', alignItems: 'center', gap: '10px',
-                                padding: '12px 20px', borderRadius: '14px',
-                                background: toast.type === 'success' ? 'rgba(16,185,129,0.15)' : 'rgba(239,68,68,0.15)',
-                                border: `1px solid ${toast.type === 'success' ? 'rgba(16,185,129,0.4)' : 'rgba(239,68,68,0.4)'}`,
-                                color: toast.type === 'success' ? '#34d399' : '#f87171',
-                                boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
-                                backdropFilter: 'blur(10px)',
+                                width: '100%', padding: '9px 12px 9px 36px',
+                                background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                                borderRadius: 'var(--radius-md)', color: 'var(--text-primary)',
+                                fontSize: '14px', outline: 'none', boxSizing: 'border-box',
                             }}
-                        >
-                            {toast.type === 'success' ? <Check size={16} /> : <X size={16} />}
-                            <span style={{ fontSize: '14px', fontWeight: 600 }}>{toast.msg}</span>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
-
-                {/* Header */}
-                <div className="page-header">
-                    <h1 className="page-title">Product Explorer</h1>
-                    <p className="page-subtitle">Discover and order products with AI-powered search</p>
+                        />
+                    </div>
+                    <button onClick={handleAiSearch} disabled={aiSearching}
+                            style={{
+                                display: 'flex', alignItems: 'center', gap: '6px',
+                                padding: '9px 16px', background: 'var(--accent)',
+                                border: 'none', borderRadius: 'var(--radius-md)',
+                                color: '#fff', fontSize: '13px', fontWeight: 500,
+                                cursor: aiSearching ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+                                opacity: aiSearching ? 0.7 : 1,
+                            }}>
+                        <Sparkles size={14} />
+                        {aiSearching ? 'Searching...' : 'AI Search'}
+                    </button>
                 </div>
 
-                {/* Search */}
-                <div style={{ background: 'rgba(15,23,42,0.85)', border: '1px solid rgba(51,65,85,0.5)', borderRadius: '20px', padding: '24px', marginBottom: '24px' }}>
-                    <div style={{ display: 'flex', gap: '12px' }}>
-                        <div style={{ flex: 1, position: 'relative' }}>
-                            <Search size={16} style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: '#64748b' }} />
-                            <input
-                                type="text"
-                                placeholder="Try: 'fast laptop for gaming' or 'wireless accessories under $200'"
-                                value={searchQuery}
-                                onChange={e => setSearchQuery(e.target.value)}
-                                onKeyDown={e => e.key === 'Enter' && handleAiSearch()}
-                                style={{
-                                    width: '100%', padding: '12px 16px 12px 44px',
-                                    background: 'rgba(30,41,59,0.8)',
-                                    border: '1px solid rgba(71,85,105,0.6)',
-                                    borderRadius: '12px', color: 'white', fontSize: '14px',
-                                    outline: 'none', boxSizing: 'border-box',
-                                }}
-                            />
+                {aiResult && (
+                    <div style={{
+                        marginTop: '12px', padding: '12px 14px',
+                        background: 'var(--accent-light)', border: '1px solid var(--accent)',
+                        borderRadius: 'var(--radius-md)', fontSize: '13px', color: 'var(--text-primary)',
+                    }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                            <Sparkles size={13} style={{ color: 'var(--accent)' }} />
+                            <span style={{ fontSize: '12px', fontWeight: 600, color: 'var(--accent)' }}>AI Result</span>
                         </div>
-                        <button
-                            onClick={handleAiSearch}
-                            disabled={isAiSearching}
-                            style={{
-                                display: 'flex', alignItems: 'center', gap: '8px',
-                                padding: '12px 22px',
-                                background: isAiSearching ? 'rgba(99,102,241,0.4)' : 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
-                                border: 'none', borderRadius: '12px',
-                                color: 'white', fontSize: '14px', fontWeight: 600,
-                                cursor: isAiSearching ? 'not-allowed' : 'pointer',
-                                whiteSpace: 'nowrap',
-                            }}
-                        >
-                            <Sparkles size={15} />
-                            {isAiSearching ? 'Searching...' : 'AI Search'}
-                        </button>
-                    </div>
-
-                    <AnimatePresence>
-                        {aiSearchResult && (
-                            <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                style={{
-                                    marginTop: '16px', padding: '16px',
-                                    background: 'rgba(59,130,246,0.08)',
-                                    border: '1px solid rgba(59,130,246,0.25)',
-                                    borderRadius: '12px',
-                                }}
-                            >
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                                    <Sparkles size={14} style={{ color: '#60a5fa' }} />
-                                    <span style={{ fontSize: '12px', fontWeight: 700, color: '#60a5fa' }}>AI ANALYSIS</span>
-                                </div>
-                                <p style={{ fontSize: '13px', color: '#cbd5e1', lineHeight: '1.6', margin: 0 }}>{aiSearchResult}</p>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-                </div>
-
-                {/* Filters */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '24px', flexWrap: 'wrap' }}>
-                    {categories.map(cat => (
-                        <button key={cat} onClick={() => setSelectedCategory(cat)}
-                                style={{
-                                    padding: '8px 18px',
-                                    background: selectedCategory === cat ? 'rgba(59,130,246,0.2)' : 'rgba(30,41,59,0.6)',
-                                    border: `1px solid ${selectedCategory === cat ? 'rgba(59,130,246,0.5)' : 'rgba(51,65,85,0.5)'}`,
-                                    borderRadius: '20px',
-                                    color: selectedCategory === cat ? '#60a5fa' : '#94a3b8',
-                                    fontSize: '13px', fontWeight: selectedCategory === cat ? 600 : 400,
-                                    cursor: 'pointer', transition: 'all 0.2s',
-                                }}
-                        >
-                            {cat}
-                        </button>
-                    ))}
-                    <span style={{ marginLeft: 'auto', fontSize: '13px', color: '#64748b' }}>
-            {filtered.length} product{filtered.length !== 1 ? 's' : ''}
-          </span>
-                </div>
-
-                {/* Products Grid */}
-                {filtered.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px', color: '#475569' }}>
-                        <Package size={48} style={{ margin: '0 auto 16px', display: 'block', opacity: 0.3 }} />
-                        <p style={{ fontSize: '16px', fontWeight: 600 }}>No products found</p>
-                        <p style={{ fontSize: '14px', marginTop: '4px' }}>Try a different search or category</p>
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '20px' }}>
-                        {filtered.map((product, i) => (
-                            <motion.div key={product.id}
-                                        initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.06 }}
-                                        whileHover={{ y: -4 }}
-                                        style={{
-                                            background: 'rgba(15,23,42,0.85)',
-                                            border: '1px solid rgba(51,65,85,0.6)',
-                                            borderRadius: '20px', overflow: 'hidden',
-                                        }}
-                            >
-                                {/* Product Image */}
-                                <div style={{
-                                    height: '140px',
-                                    background: 'linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08))',
-                                    borderBottom: '1px solid rgba(51,65,85,0.4)',
-                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    position: 'relative',
-                                }}>
-                                    <Package size={48} style={{ color: 'rgba(99,102,241,0.4)' }} />
-                                    {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
-                                        <div style={{
-                                            position: 'absolute', top: '10px', right: '10px',
-                                            padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                                            background: 'rgba(245,158,11,0.15)', color: '#fbbf24', border: '1px solid rgba(245,158,11,0.3)',
-                                        }}>
-                                            Only {product.stockQuantity} left!
-                                        </div>
-                                    )}
-                                    {product.stockQuantity === 0 && (
-                                        <div style={{
-                                            position: 'absolute', top: '10px', right: '10px',
-                                            padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: 700,
-                                            background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.3)',
-                                        }}>
-                                            Out of Stock
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Content */}
-                                <div style={{ padding: '20px' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '8px' }}>
-                                        <h3 style={{ fontSize: '15px', fontWeight: 700, color: 'white', margin: 0, lineHeight: '1.3' }}>{product.name}</h3>
-                                        <span style={{
-                                            padding: '3px 10px', flexShrink: 0,
-                                            background: 'rgba(99,102,241,0.12)', border: '1px solid rgba(99,102,241,0.25)',
-                                            borderRadius: '20px', fontSize: '11px', color: '#a5b4fc', fontWeight: 600,
-                                        }}>
-                      {product.category}
-                    </span>
-                                    </div>
-
-                                    <p style={{ fontSize: '13px', color: '#94a3b8', marginBottom: '12px', lineHeight: '1.5' }}>
-                                        {product.description}
-                                    </p>
-
-                                    <div style={{ display: 'flex', gap: '2px', marginBottom: '16px', alignItems: 'center' }}>
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star key={i} size={12} style={{ color: '#fbbf24', fill: '#fbbf24' }} />
-                                        ))}
-                                        <span style={{ fontSize: '11px', color: '#64748b', marginLeft: '6px' }}>5.0 (24 reviews)</span>
-                                    </div>
-
-                                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
-                                        <div>
-                      <span style={{ fontSize: '24px', fontWeight: 800, color: '#60a5fa' }}>
-                        ${product.price.toFixed(2)}
-                      </span>
-                                            <div style={{ fontSize: '11px', color: product.stockQuantity > 10 ? '#34d399' : product.stockQuantity > 0 ? '#fbbf24' : '#f87171', marginTop: '2px', fontWeight: 600 }}>
-                                                {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'}
-                                            </div>
-                                        </div>
-
-                                        <motion.button
-                                            whileHover={{ scale: product.stockQuantity > 0 ? 1.05 : 1 }}
-                                            whileTap={{ scale: product.stockQuantity > 0 ? 0.95 : 1 }}
-                                            onClick={() => product.stockQuantity > 0 && handleBuyNow(product)}
-                                            disabled={product.stockQuantity === 0 || orderingProduct === product.id}
-                                            style={{
-                                                display: 'flex', alignItems: 'center', gap: '6px',
-                                                padding: '10px 16px',
-                                                background: product.stockQuantity === 0
-                                                    ? 'rgba(51,65,85,0.3)'
-                                                    : orderingProduct === product.id
-                                                        ? 'rgba(59,130,246,0.3)'
-                                                        : 'linear-gradient(135deg, #3b82f6, #6366f1)',
-                                                border: 'none', borderRadius: '12px',
-                                                color: product.stockQuantity === 0 ? '#475569' : 'white',
-                                                fontSize: '13px', fontWeight: 700,
-                                                cursor: product.stockQuantity === 0 || orderingProduct === product.id ? 'not-allowed' : 'pointer',
-                                                boxShadow: product.stockQuantity > 0 && orderingProduct !== product.id ? '0 4px 15px rgba(59,130,246,0.3)' : 'none',
-                                                whiteSpace: 'nowrap',
-                                                transition: 'all 0.2s',
-                                            }}
-                                        >
-                                            {orderingProduct === product.id ? (
-                                                <>
-                                                    <div style={{ width: '14px', height: '14px', border: '2px solid rgba(255,255,255,0.3)', borderTop: '2px solid white', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                                                    Ordering...
-                                                </>
-                                            ) : product.stockQuantity === 0 ? (
-                                                'Out of Stock'
-                                            ) : (
-                                                <>
-                                                    <ShoppingCart size={14} />
-                                                    Buy Now
-                                                </>
-                                            )}
-                                        </motion.button>
-                                    </div>
-                                </div>
-                            </motion.div>
-                        ))}
+                        {aiResult}
                     </div>
                 )}
             </div>
+
+            {/* Filters */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+                {categories.map(cat => (
+                    <button key={cat} onClick={() => setCategory(cat)}
+                            style={{
+                                padding: '6px 14px', borderRadius: '20px', fontSize: '13px',
+                                background: category === cat ? 'var(--accent)' : 'var(--bg-card)',
+                                border: `1px solid ${category === cat ? 'var(--accent)' : 'var(--border)'}`,
+                                color: category === cat ? '#fff' : 'var(--text-secondary)',
+                                cursor: 'pointer', fontWeight: category === cat ? 500 : 400,
+                                transition: 'all 0.15s',
+                            }}>
+                        {cat}
+                    </button>
+                ))}
+                <span style={{ marginLeft: 'auto', fontSize: '13px', color: 'var(--text-muted)' }}>
+          {filtered.length} product{filtered.length !== 1 ? 's' : ''}
+        </span>
+            </div>
+
+            {/* Grid */}
+            {filtered.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '60px', color: 'var(--text-muted)' }}>
+                    <Package size={40} style={{ margin: '0 auto 12px', display: 'block', opacity: 0.3 }} />
+                    <p style={{ fontSize: '15px' }}>No products found</p>
+                </div>
+            ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '16px' }}>
+                    {filtered.map(product => (
+                        <div key={product.id} style={{
+                            background: 'var(--bg-card)', border: '1px solid var(--border)',
+                            borderRadius: 'var(--radius-lg)', overflow: 'hidden',
+                            transition: 'box-shadow 0.15s',
+                        }}
+                             onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--shadow-md)')}
+                             onMouseLeave={e => (e.currentTarget.style.boxShadow = 'none')}
+                        >
+                            {/* Image */}
+                            <div style={{
+                                height: '120px', background: 'var(--bg-secondary)',
+                                borderBottom: '1px solid var(--border)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                position: 'relative',
+                            }}>
+                                <Package size={36} style={{ color: 'var(--border-strong)' }} />
+                                {product.stockQuantity <= 5 && product.stockQuantity > 0 && (
+                                    <span style={{
+                                        position: 'absolute', top: '10px', right: '10px',
+                                        padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 500,
+                                        background: 'var(--warning-light)', color: 'var(--warning)',
+                                        border: '1px solid var(--warning)',
+                                    }}>Low stock</span>
+                                )}
+                                {product.stockQuantity === 0 && (
+                                    <span style={{
+                                        position: 'absolute', top: '10px', right: '10px',
+                                        padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: 500,
+                                        background: 'var(--danger-light)', color: 'var(--danger)',
+                                        border: '1px solid var(--danger)',
+                                    }}>Out of stock</span>
+                                )}
+                            </div>
+
+                            {/* Content */}
+                            <div style={{ padding: '16px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                                    <h3 style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', margin: 0 }}>{product.name}</h3>
+                                    <span style={{
+                                        padding: '2px 8px', flexShrink: 0,
+                                        background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+                                        borderRadius: '20px', fontSize: '11px', color: 'var(--text-secondary)',
+                                    }}>{product.category}</span>
+                                </div>
+
+                                <p style={{ fontSize: '13px', color: 'var(--text-secondary)', margin: '0 0 10px', lineHeight: '1.5' }}>
+                                    {product.description}
+                                </p>
+
+                                <div style={{ display: 'flex', gap: '2px', marginBottom: '14px' }}>
+                                    {[...Array(5)].map((_, i) => (
+                                        <Star key={i} size={11} style={{ color: '#f59e0b', fill: '#f59e0b' }} />
+                                    ))}
+                                    <span style={{ fontSize: '11px', color: 'var(--text-muted)', marginLeft: '4px' }}>5.0</span>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <div>
+                                        <div style={{ fontSize: '20px', fontWeight: 600, color: 'var(--text-primary)' }}>
+                                            ${product.price.toFixed(2)}
+                                        </div>
+                                        <div style={{
+                                            fontSize: '11px', marginTop: '2px',
+                                            color: product.stockQuantity > 10 ? 'var(--success)' : product.stockQuantity > 0 ? 'var(--warning)' : 'var(--danger)',
+                                        }}>
+                                            {product.stockQuantity > 0 ? `${product.stockQuantity} in stock` : 'Out of stock'}
+                                        </div>
+                                    </div>
+
+                                    <button
+                                        onClick={() => product.stockQuantity > 0 && handleBuy(product)}
+                                        disabled={product.stockQuantity === 0 || ordering === product.id}
+                                        style={{
+                                            display: 'flex', alignItems: 'center', gap: '6px',
+                                            padding: '8px 14px', borderRadius: 'var(--radius-md)',
+                                            background: product.stockQuantity === 0 ? 'var(--bg-secondary)' : 'var(--accent)',
+                                            border: `1px solid ${product.stockQuantity === 0 ? 'var(--border)' : 'var(--accent)'}`,
+                                            color: product.stockQuantity === 0 ? 'var(--text-muted)' : '#fff',
+                                            fontSize: '13px', fontWeight: 500,
+                                            cursor: product.stockQuantity === 0 || ordering === product.id ? 'not-allowed' : 'pointer',
+                                            transition: 'all 0.15s',
+                                            opacity: ordering === product.id ? 0.7 : 1,
+                                        }}>
+                                        {ordering === product.id ? (
+                                            <div className="spinner" style={{ width: '14px', height: '14px' }} />
+                                        ) : (
+                                            <>
+                                                <ShoppingCart size={13} />
+                                                Buy
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }
