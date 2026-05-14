@@ -66,15 +66,30 @@ export const aiApi = {
         api.post('/api/ai/inventory/predict', data),
 };
 
-// Health check direct pour chaque service
 export const healthApi = {
     checkAllServices: async (): Promise<Record<string, boolean>> => {
-        try {
-            const r = await api.get('/api/health/services', { timeout: 10000 });
-            return r.data;
-        } catch {
-            return {};
-        }
+        const services = [
+            { id: 'api-gateway',  url: '/proxy/8080/actuator/health' },
+            { id: 'identity',     url: '/proxy/8085/actuator/health' },
+            { id: 'product',      url: '/proxy/8081/actuator/health' },
+            { id: 'order',        url: '/proxy/8082/actuator/health' },
+            { id: 'inventory',    url: '/proxy/8083/actuator/health' },
+            { id: 'notification', url: '/proxy/8084/actuator/health' },
+            { id: 'ai',           url: '/proxy/8086/actuator/health' },
+        ];
+
+        const results = await Promise.all(
+            services.map(async svc => {
+                try {
+                    const r = await axios.get(svc.url, { timeout: 2000 });
+                    return [svc.id, r.data?.status === 'UP'];
+                } catch {
+                    return [svc.id, false];
+                }
+            })
+        );
+
+        return Object.fromEntries(results);
     }
 };
 
