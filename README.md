@@ -563,13 +563,3 @@ Commit types: `feat` · `fix` · `docs` · `refactor` · `test` · `chore`
 ## License
 
 This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**EcoSphere** — Java 21 · Spring Boot 3.3 · React 18 · Apache Kafka · Groq AI
-
-*Production-grade microservices: security in depth · event-driven architecture · AI integration · full observability*
-
-</div>
